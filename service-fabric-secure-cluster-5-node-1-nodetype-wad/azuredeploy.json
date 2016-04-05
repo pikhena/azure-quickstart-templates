@@ -118,7 +118,7 @@
         "description": "Replication option for the support log storage account"
       }
     },
-    "applicationDiagnosticsStorageAccountType": {
+  "applicationDiagnosticsStorageAccountType": {
       "type": "string",
       "allowedValues": [
         "Standard_LRS",
@@ -128,8 +128,14 @@
       "metadata": {
         "description": "Replication option for the application diagnostics storage account"
       }
-    }
-  },
+    },
+    "applicationDiagnosticsStorageAccountName": {
+      "type": "string",
+      "defaultValue": "sfdgcremebrulee5623",
+      "metadata": {
+        "description": "Name for the storage account that contains application diagnostics data from the cluster"
+      }
+    },
   "variables": {
     "computeLocation": "[parameters('clusterLocation')]",
     "dnsName": "[parameters('clusterName')]",
@@ -173,18 +179,18 @@
   },
   "resources": [
     {
-      "apiVersion": "2015-06-15",
-      "type": "Microsoft.Storage/storageAccounts",
-      "name": "[variables('vmStorageAccountName')]",
-      "location": "[variables('computeLocation')]",
-      "properties": {
-        "accountType": "[parameters('storageAccountType')]"
-      },
-      "tags": {
-        "resourceType": "Service Fabric",
-        "clusterName": "[parameters('clusterName')]"
-      }
-    },
+  "apiVersion": "2015-05-01-preview",
+  "type": "Microsoft.Storage/storageAccounts",
+  "name": "[parameters('applicationDiagnosticsStorageAccountName')]",
+  "location": "[parameters('computeLocation')]",
+  "properties": {
+    "accountType": "[parameters('applicationDiagnosticsStorageAccountType')]"
+  },
+  "tags": {
+    "resourceType": "Service Fabric",
+    "clusterName": "[parameters('clusterName')]"
+    }
+  },
     {
       "apiVersion": "2015-06-15",
       "type": "Microsoft.Storage/storageAccounts",
@@ -452,7 +458,60 @@
                       "x509StoreName": "[parameters('certificateStoreValue')]"
                     }
                   },
+                  
                   "typeHandlerVersion": "1.0"
+                }
+              },
+                {
+                "name": "[concat(parameters('vmNodeType0Name'),'_Microsoft.Insights.VMDiagnosticsSettings')]",
+                "properties": {
+                    "type": "IaaSDiagnostics",
+                    "autoUpgradeMinorVersion": true,
+                    "protectedSettings": {
+                    "storageAccountName": "[parameters('applicationDiagnosticsStorageAccountName')]",
+                    "storageAccountKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('applicationDiagnosticsStorageAccountName')),'2015-05-01-preview').key1]",
+                    "storageAccountEndPoint": "https://core.windows.net/"
+                    },
+                    "publisher": "Microsoft.Azure.Diagnostics",
+                    "settings": {
+                    "WadCfg": {
+                        "DiagnosticMonitorConfiguration": {
+                        "overallQuotaInMB": "50000",
+                        "EtwProviders": {
+                            "EtwEventSourceProviderConfiguration": [
+                            {
+                                "provider": "Microsoft-ServiceFabric-Actors",
+                                "scheduledTransferKeywordFilter": "1",
+                                "scheduledTransferPeriod": "PT5M",
+                                "DefaultEvents": {
+                                "eventDestination": "ServiceFabricReliableActorEventTable"
+                                }
+                            },
+                            {
+                                "provider": "Microsoft-ServiceFabric-Services",
+                                "scheduledTransferPeriod": "PT5M",
+                                "DefaultEvents": {
+                                "eventDestination": "ServiceFabricReliableServiceEventTable"
+                                }
+                            }
+                            ],
+                            "EtwManifestProviderConfiguration": [
+                            {
+                                "provider": "cbd93bc2-71e5-4566-b3a7-595d8eeca6e8",
+                                "scheduledTransferLogLevelFilter": "Information",
+                                "scheduledTransferKeywordFilter": "4611686018427387904",
+                                "scheduledTransferPeriod": "PT5M",
+                                "DefaultEvents": {
+                                "eventDestination": "ServiceFabricSystemEventTable"
+                                }
+                            }
+                            ]
+                        }
+                        }
+                    },
+                    "StorageAccount": "[parameters('applicationDiagnosticsStorageAccountName')]"
+                    },
+                    "typeHandlerVersion": "1.5"
                 }
               },
               {
